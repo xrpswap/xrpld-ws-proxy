@@ -1,0 +1,6 @@
+{
+  "name": "xrpld-ws-proxy",
+  "description": "High-performance XRPL (rippled) pure WebSocket reverse proxy with smart role routing, stateless ID multiplexing, stateful channel isolation, token-bucket rate limiting, and circuit breaking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

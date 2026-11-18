@@ -1,0 +1,155 @@
+export const config = {
+  server: {
+    host: process.env.PROXY_HOST || '0.0.0.0',
+    port: Number(process.env.PROXY_PORT || 8080),
+    maxPayloadBytes: 1024 * 1024, // 1MB
+    maxConnectionsPerIp: 20,
+    trustProxy: process.env.TRUST_PROXY === 'true',
+    heartbeatIntervalMs: 30000,
+    statsLogIntervalMs: 60000,
+  },
+  limits: {
+    requestTimeoutMs: 15000,
+    nodeCooldownMs: 30000,
+    maxPathTtlMs: 180000, // 3 minutes
+    queueMaxWaitMs: 800,
+    queueMaxLength: 200,
+    circuitBreakerThreshold: 3,
+    slowDownRecoveryMs: 15000,
+    upstreamPingIntervalMs: 25000,
+    reconnectBaseDelayMs: 500,
+    reconnectMaxDelayMs: 15000,
+  },
+  routing: {
+    pathCommands: ['path_find', 'ripple_path_find'],
+    historyCommands: [
+      'tx',
+      'account_tx',
+      'tx_history',
+      'transaction_entry',
+      'nft_history',
+      'book_changes',
+    ],
+    submitCommands: ['submit', 'submit_multisigned', 'sign_and_submit'],
+    statefulCommands: ['path_find', 'subscribe', 'unsubscribe'],
+    routeExplicitLedgerToHistory: true,
+    defaultWeight: 2,
+    commandWeights: {
+      ping: 1,
+      fee: 1,
+      server_info: 1,
+      server_state: 1,
+      ledger_closed: 1,
+      ledger_current: 1,
+      random: 1,
+      manifest: 1,
+
+      account_info: 2,
+      account_objects: 2,
+      account_currencies: 2,
+      account_channels: 2,
+      ledger: 2,
+      ledger_entry: 2,
+      gateway_balances: 2,
+      noripple_check: 2,
+      subscribe: 2,
+      unsubscribe: 2,
+      submit: 2,
+      submit_multisigned: 2,
+      sign_and_submit: 2,
+
+      account_lines: 4,
+      account_offers: 4,
+      account_nfts: 4,
+      book_offers: 4,
+      ledger_data: 4,
+      nft_info: 4,
+      simulate: 4,
+
+      tx: 5,
+      account_tx: 5,
+      tx_history: 5,
+      transaction_entry: 5,
+      nft_history: 5,
+      book_changes: 5,
+      ripple_path_find: 5,
+      path_find: 5,
+    },
+  },
+  cache: {
+    enabled: true,
+    ttlMs: 1500,
+    commands: ['fee', 'server_info', 'ledger_closed'],
+  },
+  nodes: [
+    {
+      id: 'xrplcluster',
+      wsUrl: 'wss://xrplcluster.com/',
+      roles: ['normal', 'history', 'path', 'submit'],
+      poolSize: 2,
+      maxPathConns: 15,
+      maxSubscribeConns: 30,
+      rateLimit: {
+        ratePerSec: 15,
+        burst: 30,
+      },
+    },
+    {
+      id: 'ripple-s1',
+      wsUrl: 'wss://s1.ripple.com/',
+      roles: ['normal', 'path', 'submit'],
+      poolSize: 2,
+      maxPathConns: 15,
+      maxSubscribeConns: 30,
+      rateLimit: {
+        ratePerSec: 15,
+        burst: 30,
+      },
+    },
+    {
+      id: 'ripple-s2-history',
+      wsUrl: 'wss://s2.ripple.com/',
+      roles: ['history'],
+      poolSize: 2,
+      maxPathConns: 0,
+      maxSubscribeConns: 0,
+      rateLimit: {
+        ratePerSec: 10,
+        burst: 20,
+      },
+    },
+    {
+      id: 'honeycluster',
+      wsUrl: 'wss://honeycluster.io/',
+      roles: ['normal', 'history'],
+      poolSize: 2,
+      maxPathConns: 0,
+      maxSubscribeConns: 20,
+      rateLimit: {
+        ratePerSec: 15,
+        burst: 30,
+      },
+    },
+  ],
+};
+
+export function createConfig(overrides = {}) {
+  return {
+    server: { ...config.server, ...(overrides.server || {}) },
+    limits: { ...config.limits, ...(overrides.limits || {}) },
+    routing: {
+      ...config.routing,
+      ...(overrides.routing || {}),
+      commandWeights: {
+        ...config.routing.commandWeights,
+        ...(overrides.routing?.commandWeights || {}),
+      },
+    },
+    cache: { ...config.cache, ...(overrides.cache || {}) },
+    nodes: overrides.nodes ?? config.nodes.map((n) => ({
+      ...n,
+      roles: [...n.roles],
+      rateLimit: { ...n.rateLimit },
+    })),
+  };
+}
