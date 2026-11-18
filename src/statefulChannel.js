@@ -74,6 +74,7 @@ class DedicatedUpstreamChannel {
       if (this.ws === ws) {
         this.ws = null;
       }
+      ws.removeAllListeners();
       const wasIntentional = this.intentionalClose || this.destroyed;
       const hadOpened = this.hasOpened;
       const queued = [...this.outboundQueue];
@@ -321,7 +322,7 @@ export class ClientStatefulManager {
           return;
         }
 
-        this.pathChannel = new DedicatedUpstreamChannel({
+        const ch = new DedicatedUpstreamChannel({
           channelType: 'path_find',
           node: slot.node,
           releaseSlot: slot.release,
@@ -329,9 +330,12 @@ export class ClientStatefulManager {
           nodeManager: this.nodeManager,
           limits: this.limits,
           onClosed: () => {
-            this.pathChannel = null;
+            if (this.pathChannel === ch) {
+              this.pathChannel = null;
+            }
           },
         });
+        this.pathChannel = ch;
       }
 
       this.pathChannel.send(payload, idInfo);
@@ -359,7 +363,7 @@ export class ClientStatefulManager {
         return;
       }
 
-      this.subscribeChannel = new DedicatedUpstreamChannel({
+      const ch = new DedicatedUpstreamChannel({
         channelType: 'subscribe',
         node: slot.node,
         releaseSlot: slot.release,
@@ -367,9 +371,12 @@ export class ClientStatefulManager {
         nodeManager: this.nodeManager,
         limits: this.limits,
         onClosed: () => {
-          this.subscribeChannel = null;
+          if (this.subscribeChannel === ch) {
+            this.subscribeChannel = null;
+          }
         },
       });
+      this.subscribeChannel = ch;
     }
 
     this.subscribeChannel.send(payload, idInfo);

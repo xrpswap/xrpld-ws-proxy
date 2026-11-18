@@ -73,6 +73,7 @@ class UpstreamPoolConnection {
       if (this.ws === ws) {
         this.ws = null;
       }
+      ws.removeAllListeners();
       this.stopHeartbeat();
       this.pool.updateNodeConnectedCount(this.node.id);
 

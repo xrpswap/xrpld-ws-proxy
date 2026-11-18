@@ -59,6 +59,10 @@ export class ProxyServer {
    * @returns {Promise<{ host: string, port: number }>}
    */
   async start() {
+    if (this.wss) {
+      return this.getBoundAddress();
+    }
+
     this.statelessPool.start();
 
     const wssOptions = {
@@ -103,24 +107,32 @@ export class ProxyServer {
     this.startClientHeartbeat();
 
     if (this.httpServer) {
+      return this.getBoundAddress();
+    }
+
+    return new Promise((resolve, reject) => {
+      this.wss.once('listening', () => {
+        resolve(this.getBoundAddress());
+      });
+      this.wss.once('error', reject);
+    });
+  }
+
+  getBoundAddress() {
+    if (this.httpServer) {
       const addr = this.httpServer.address();
       if (addr && typeof addr === 'object') {
         return { host: addr.address, port: addr.port };
       }
       return { host: this.config.server.host ?? '0.0.0.0', port: this.config.server.port ?? 3000 };
     }
-
-    return new Promise((resolve, reject) => {
-      this.wss.once('listening', () => {
-        const addr = this.wss.address();
-        if (addr && typeof addr === 'object') {
-          resolve({ host: addr.address, port: addr.port });
-        } else {
-          resolve({ host: this.config.server.host ?? '0.0.0.0', port: this.config.server.port ?? 8080 });
-        }
-      });
-      this.wss.once('error', reject);
-    });
+    if (this.wss) {
+      const addr = this.wss.address();
+      if (addr && typeof addr === 'object') {
+        return { host: addr.address, port: addr.port };
+      }
+    }
+    return { host: this.config.server.host ?? '0.0.0.0', port: this.config.server.port ?? 8080 };
   }
 
   handleClientConnection(ws, req) {
@@ -147,18 +159,22 @@ export class ProxyServer {
     };
     this.sessions.add(session);
 
-    ws.on('pong', () => {
+    const onPong = () => {
       session.isAlive = true;
-    });
+    };
 
-    ws.on('message', (data) => {
+    const onMessage = (data) => {
       if (this.shuttingDown) return;
       this.handleClientMessage(session, data);
-    });
+    };
 
     const cleanupSession = () => {
       if (!this.sessions.has(session)) return;
       this.sessions.delete(session);
+      ws.off('pong', onPong);
+      ws.off('message', onMessage);
+      ws.off('close', cleanupSession);
+      ws.off('error', cleanupSession);
       const count = (this.ipConnectionCounts.get(ip) || 1) - 1;
       if (count <= 0) {
         this.ipConnectionCounts.delete(ip);
@@ -168,6 +184,8 @@ export class ProxyServer {
       session.stateful.destroyAll();
     };
 
+    ws.on('pong', onPong);
+    ws.on('message', onMessage);
     ws.on('close', cleanupSession);
     ws.on('error', cleanupSession);
   }
@@ -293,10 +311,12 @@ export class ProxyServer {
     this.cache.clear();
 
     if (this.wss) {
-      await new Promise((resolve) => {
-        this.wss.close(() => resolve(undefined));
-      });
+      const wss = this.wss;
       this.wss = null;
+      await new Promise((resolve) => {
+        wss.close(() => resolve(undefined));
+      });
+      wss.removeAllListeners();
     }
   }
 }

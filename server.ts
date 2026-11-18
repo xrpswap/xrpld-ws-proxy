@@ -348,6 +348,7 @@ async function startServer() {
       server: {
         middlewareMode: true,
         hmr: false,
+        ws: false,
       },
       appType: 'spa',
     });
@@ -359,7 +360,10 @@ async function startServer() {
     console.log(`[xrpld-ws-proxy] Web Console + WS Proxy (/ws) running on http://0.0.0.0:${PORT}`);
   });
 
+  let isShuttingDown = false;
   const shutdown = async () => {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
     await proxy.shutdown();
     await Promise.all(mockNodes.map((n) => n.stop()));
     httpServer.close(() => process.exit(0));
